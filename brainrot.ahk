@@ -109,21 +109,29 @@ ScrollTikTok(direction) {
     ; lParam = position du curseur (x dans les 16 bits bas, y dans les hauts).
     lParam := (py << 16) | (px & 0xFFFF)
 
+    ; On vise le contrôle réel sous le point (le rendu de la page web), sinon
+    ; le scroll est souvent ignoré si on l'envoie à la fenêtre racine.
+    target := ControlUnderPoint(px, py)
+    if (!target)
+        target := hwnd
+
     Loop Config.wheelClicks {
         ; wParam : delta de molette dans les 16 bits hauts (signé).
         delta := direction * Config.wheelDelta
         wParam := (delta & 0xFFFF) << 16
 
-        ; On vise le contrôle réel sous le curseur dans la fenêtre, sinon
-        ; on retombe sur la fenêtre principale.
-        target := ControlFromPoint(px, py, hwnd)
-        if (!target)
-            target := hwnd
-
         ; WM_MOUSEWHEEL = 0x020A. PostMessage = asynchrone, ne bloque pas.
         PostMessage(0x020A, wParam, lParam, , target)
         Sleep(8)
     }
+}
+
+; Renvoie le hwnd du contrôle situé sous un point écran (x, y).
+; AHK v2 n'a pas de "ControlFromPoint" : on appelle l'API Win32 WindowFromPoint.
+ControlUnderPoint(x, y) {
+    ; POINT est packé : x et y en Int32 successifs -> un seul Int64.
+    pt := (y << 32) | (x & 0xFFFFFFFF)
+    return DllCall("WindowFromPoint", "Int64", pt, "Ptr")
 }
 
 
