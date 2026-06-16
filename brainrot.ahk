@@ -2,11 +2,18 @@
 #SingleInstance Force
 SendMode("Input")
 
+; À la fermeture du script, on libère l'API Magnification si elle a été init.
+OnExit(CleanupMirror)
+
 ; ----------------------------------------------------------------------------
 ;  ÉTAT GLOBAL
 ; ----------------------------------------------------------------------------
-; hwnd de la mini-fenêtre PiP (overlay) quand elle est ouverte, sinon 0.
-global gPipHwnd := 0
+; Objet GUI de la fenêtre miroir quand elle est ouverte, sinon 0.
+global gMirrorGui := 0
+; hwnd du contrôle "Magnifier" à l'intérieur de la fenêtre miroir.
+global gMagHwnd := 0
+; true si Magnification.dll a bien été initialisée (MagInitialize).
+global gMagReady := false
 
 ; ============================================================================
 ;  BRAINROT COMPANION  —  TikTok scroller pour gamers League of Legends
@@ -20,7 +27,7 @@ global gPipHwnd := 0
 ;     ²   -> scrolle d'une vidéo (vers le bas)
 ;     Maj + ²  -> scrolle vers le haut (vidéo précédente)
 ;     )   -> mute / unmute la vidéo
-;     =   -> mini-fenêtre PiP nue en haut à gauche de l'écran principal (on/off)
+;     =   -> MIROIR live du 2e écran en haut à gauche de l'écran principal (on/off)
 ;
 ;  Config tout en bas du fichier (chemin du navigateur, écran, touches...).
 ; ============================================================================
@@ -53,21 +60,22 @@ class Config {
     ; reconnaître l'onglet TikTok.
     static windowMatch := "TikTok"
 
-    ; --- Mini-fenêtre PiP (overlay sur l'écran principal) ---
-    ; Taille de la petite fenêtre TikTok flottante, en pixels.
-    static pipWidth := 380
-    static pipHeight := 680
+    ; --- Miroir live du 2e écran (overlay sur l'écran principal) — touche "=" ---
+    ; Le miroir recopie en direct une ZONE du 2e écran (là où TikTok est
+    ; maximisé) dans une petite fenêtre flottante, par-dessus League.
+    ;
+    ; Taille de la fenêtre miroir, en pixels (ratio vertical type TikTok 9:16).
+    static mirrorWidth := 380
+    static mirrorHeight := 680
     ; Position depuis le coin haut-gauche de l'écran principal, en pixels.
-    static pipX := 20
-    static pipY := 20
-
-    ; Dossier de l'extension Chrome qui masque l'UI TikTok (juste la vidéo).
-    ; Par défaut : sous-dossier "tiktok-clean" à côté de ce script.
-    static cleanExtDir := A_ScriptDir "\tiktok-clean"
-
-    ; Profil Chrome DÉDIÉ au mode PiP (obligatoire pour charger l'extension
-    ; sans toucher au Chrome perso de l'utilisateur). Créé automatiquement.
-    static pipProfileDir := A_ScriptDir "\.pip-profile"
+    static mirrorX := 20
+    static mirrorY := 20
+    ; Rafraîchissements par seconde du miroir. 30 = fluide et léger ; monte à 60
+    ; pour plus de fluidité (un peu plus de CPU/GPU).
+    static mirrorFps := 30
+    ; Quel écran on recopie. Par défaut le même que TikTok (monitorIndex).
+    ; Laisse 0 pour suivre automatiquement monitorIndex.
+    static mirrorSourceMonitor := 0
 }
 
 
@@ -83,7 +91,7 @@ SC00B::OpenTikTok()          ; touche "à"  -> ouvrir / focus TikTok (2e écran)
 SC029::ScrollTikTok(-1)      ; touche "²"  -> vidéo suivante (scroll bas)
 +SC029::ScrollTikTok(+1)     ; Maj + "²"   -> vidéo précédente (scroll haut)
 SC00C::ToggleMuteTikTok()    ; touche ")"  -> mute / unmute TikTok
-SC00D::TogglePip()           ; touche "="  -> mini-fenêtre PiP overlay on/off
+SC00D::ToggleMirror()        ; touche "="  -> miroir live du 2e écran on/off
 
 
 ; ----------------------------------------------------------------------------
@@ -113,89 +121,123 @@ OpenTikTok() {
 
 
 ; ----------------------------------------------------------------------------
-;  MINI-FENÊTRE PiP (overlay sur l'écran principal)  —  touche "="
+;  MIROIR LIVE DU 2e ÉCRAN (overlay sur l'écran principal)  —  touche "="
 ; ----------------------------------------------------------------------------
-;  Toggle : 1er appui -> ouvre une petite fenêtre TikTok NUE (sans aucune
-;  bordure ni barre d'URL) en haut à gauche, épinglée par-dessus League.
-;  2e appui -> la ferme. Indépendant de la version 2e écran (touche "à").
+;  Au lieu d'ouvrir une 2e fenêtre TikTok (galère : Chrome, extension, etc.),
+;  on RECOPIE EN DIRECT une zone du 2e écran — là où TikTok est déjà maximisé —
+;  dans une petite fenêtre flottante par-dessus League. Aucun navigateur en
+;  plus, aucun focus volé : c'est juste une "loupe" temps réel de l'écran 2.
 ;
-;  On garde le hwnd de l'overlay dans une globale pour le fermer précisément,
-;  même si une autre fenêtre TikTok (2e écran) est ouverte en parallèle.
-;  (La globale gPipHwnd est déclarée en haut du fichier, section ÉTAT GLOBAL.)
+;  Techniquement : on utilise l'API Windows "Magnification" (Magnification.dll).
+;  Elle fournit un contrôle (classe "Magnifier") qui sait afficher en live le
+;  contenu d'un rectangle de l'écran. On le met dans une fenêtre GUI nue,
+;  always-on-top, et un timer rafraîchit la source N fois par seconde.
+;
+;  Toggle : 1er appui -> ouvre le miroir. 2e appui -> le ferme.
 ; ----------------------------------------------------------------------------
-TogglePip() {
-    global gPipHwnd
+ToggleMirror() {
+    global gMirrorGui
 
-    ; Déjà ouverte et toujours valide -> on la ferme.
-    if (gPipHwnd && WinExist("ahk_id " gPipHwnd)) {
-        WinClose("ahk_id " gPipHwnd)
-        gPipHwnd := 0
+    ; Déjà ouvert -> on ferme.
+    if (gMirrorGui) {
+        CloseMirror()
         return
     }
-    gPipHwnd := 0
-
-    ; On mémorise les fenêtres TikTok déjà présentes pour repérer la NOUVELLE.
-    SetTitleMatchMode(2)
-    before := Map()
-    for id in WinGetList(Config.windowMatch)
-        before[id] := true
-
-    ; Lancement en mode "--app" : fenêtre épurée, sans onglets ni barre d'URL.
-    ; (Chrome ET Edge supportent --app, donc on l'utilise même par défaut.)
-    exe := Config.browserPath != "" ? Config.browserPath : DefaultChromiumExe()
-    if (!exe) {
-        ToolTip("Mode PiP : Chrome ou Edge requis. Renseigne browserPath.")
-        SetTimer(() => ToolTip(), -2500)
-        return
-    }
-
-    ; On charge notre extension "tiktok-clean" qui masque toute l'UI du site
-    ; pour ne garder QUE la vidéo. Cela impose :
-    ;   --user-data-dir : un profil dédié (Chrome refuse --load-extension
-    ;                     sur le profil normal, et garantit une vraie nouvelle
-    ;                     fenêtre bien positionnée).
-    ;   --disable-extensions-except : seule notre extension tourne.
-    ;   --app : fenêtre nue, sans onglets ni barre d'URL.
-    ext := Config.cleanExtDir
-    extArgs := ""
-    if (DirExist(ext)) {
-        extArgs := ' --load-extension="' ext '"'
-                 . ' --disable-extensions-except="' ext '"'
-    }
-
-    Run('"' exe '" --app="' Config.url '"'
-        . ' --user-data-dir="' Config.pipProfileDir '"'
-        . extArgs
-        . ' --no-first-run --no-default-browser-check'
-        . ' --disable-features=Translate'
-        . ' --window-size=' Config.pipWidth ',' Config.pipHeight
-        . ' --window-position=' Config.pipX ',' Config.pipY)
-
-    ; On attend l'apparition de la fenêtre qui n'était PAS là avant.
-    pip := WaitForNewTikTokWindow(before, 8000)
-    if (!pip) {
-        ToolTip("Mode PiP : la fenêtre n'est pas apparue.")
-        SetTimer(() => ToolTip(), -2500)
-        return
-    }
-
-    gPipHwnd := pip
-    WinSetAlwaysOnTop(1, pip)              ; reste visible par-dessus League
-
-    ; Chrome redessine son cadre juste après l'ouverture : on enlève la barre
-    ; de titre une 1re fois, puis on la ré-enlève après un court délai pour
-    ; écraser ce que Chrome aurait redessiné. Enfin on repositionne proprement.
-    StripWindowChrome(pip)
-    SetTimer(() => FinalizePip(pip), -350)
+    OpenMirror()
 }
 
-; Re-applique le retrait du cadre + le placement, une fois Chrome stabilisé.
-FinalizePip(hwnd) {
-    if (!WinExist("ahk_id " hwnd))
+OpenMirror() {
+    global gMirrorGui, gMagHwnd, gMagReady
+
+    ; Init de l'API Magnification (une seule fois par exécution du script).
+    if (!gMagReady) {
+        if (!DllCall("Magnification\MagInitialize", "Int")) {
+            ToolTip("Miroir : Magnification.dll indisponible sur ce Windows.")
+            SetTimer(() => ToolTip(), -3000)
+            return
+        }
+        gMagReady := true
+    }
+
+    ; --- Fenêtre hôte : nue, sans bordure, always-on-top, par-dessus League ---
+    ; +E0x80000 = WS_EX_LAYERED, requis par l'API Magnification pour l'hôte.
+    g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000")
+    g.BackColor := "000000"
+    g.Show("x" Config.mirrorX " y" Config.mirrorY
+         . " w" Config.mirrorWidth " h" Config.mirrorHeight " NoActivate")
+
+    ; --- Contrôle "Magnifier" enfant, qui remplit toute la fenêtre hôte -------
+    ; WS_CHILD(0x40000000)|WS_VISIBLE(0x10000000) ; classe "Magnifier".
+    mag := DllCall("CreateWindowEx"
+        , "UInt", 0
+        , "Str", "Magnifier"
+        , "Str", "MagnifierControl"
+        , "UInt", 0x40000000 | 0x10000000
+        , "Int", 0, "Int", 0
+        , "Int", Config.mirrorWidth, "Int", Config.mirrorHeight
+        , "Ptr", g.Hwnd
+        , "Ptr", 0
+        , "Ptr", 0
+        , "Ptr", 0
+        , "Ptr")
+
+    if (!mag) {
+        g.Destroy()
+        ToolTip("Miroir : impossible de créer le contrôle Magnifier.")
+        SetTimer(() => ToolTip(), -3000)
         return
-    StripWindowChrome(hwnd)
-    WinMove(Config.pipX, Config.pipY, Config.pipWidth, Config.pipHeight, hwnd)
-    WinSetAlwaysOnTop(1, hwnd)
+    }
+
+    gMirrorGui := g
+    gMagHwnd := mag
+
+    ; Premier cadrage de la source + démarrage du rafraîchissement live.
+    ; Timer RÉPÉTITIF (période positive en ms) : re-capture l'écran 2 N fps.
+    UpdateMirrorSource()
+    fps := Config.mirrorFps > 0 ? Config.mirrorFps : 30
+    SetTimer(UpdateMirrorSource, Round(1000 / fps))
+
+    ; On force la fenêtre tout en haut sans lui donner le focus (League garde la main).
+    WinSetAlwaysOnTop(1, g.Hwnd)
+}
+
+CloseMirror() {
+    global gMirrorGui, gMagHwnd
+    SetTimer(UpdateMirrorSource, 0)     ; stoppe le rafraîchissement
+    if (gMirrorGui) {
+        try gMirrorGui.Destroy()
+    }
+    gMirrorGui := 0
+    gMagHwnd := 0
+}
+
+; Indique au contrôle Magnifier QUELLE zone de l'écran recopier (le 2e écran),
+; et l'ÉTIRE pour remplir la petite fenêtre. Appelé en boucle par le timer :
+; c'est ce qui rend l'image "live" (le contrôle re-capture à chaque appel).
+UpdateMirrorSource() {
+    global gMirrorGui, gMagHwnd
+    if (!gMirrorGui || !gMagHwnd)
+        return
+
+    ; Écran source : celui de TikTok, sauf override explicite dans la config.
+    idx := Config.mirrorSourceMonitor > 0
+         ? Config.mirrorSourceMonitor : Config.monitorIndex
+    count := MonitorGetCount()
+    if (idx > count)
+        idx := count
+    MonitorGet(idx, &left, &top, &right, &bottom)
+
+    ; RECT source = tout l'écran à recopier. On le passe par un buffer (4x Int32).
+    rect := Buffer(16, 0)
+    NumPut("Int", left,   rect, 0)
+    NumPut("Int", top,    rect, 4)
+    NumPut("Int", right,  rect, 8)
+    NumPut("Int", bottom, rect, 12)
+
+    ; MagSetWindowSource(hwndMag, RECT) : définit la zone capturée. Le contrôle
+    ; étire automatiquement cette zone pour remplir sa propre taille (notre
+    ; petite fenêtre) -> le 2e écran apparaît réduit dans le miroir.
+    DllCall("Magnification\MagSetWindowSource", "Ptr", gMagHwnd, "Ptr", rect, "Int")
 }
 
 
@@ -271,13 +313,9 @@ ControlUnderPoint(x, y) {
 ; ----------------------------------------------------------------------------
 
 ; Renvoie le hwnd de la fenêtre TikTok à cibler pour scroll/mute.
-; Si la mini-fenêtre PiP (overlay) est ouverte, on la priorise : c'est celle
-; que l'utilisateur regarde en mode overlay. Sinon, 1re fenêtre TikTok trouvée.
+; (Le miroir n'est qu'un reflet du 2e écran : le scroll/mute vise toujours la
+;  vraie fenêtre TikTok, et le miroir affiche le résultat en direct.)
 FindTikTokWindow() {
-    global gPipHwnd
-    if (gPipHwnd && WinExist("ahk_id " gPipHwnd))
-        return gPipHwnd
-
     ; Match partiel sur le titre, peu importe le navigateur.
     SetTitleMatchMode(2)
     ids := WinGetList(Config.windowMatch)
@@ -315,57 +353,11 @@ PlaceWindowOnMonitor(hwnd, idx) {
     WinMaximize(hwnd)
 }
 
-; Attend qu'une fenêtre TikTok ABSENTE de `before` apparaisse. Renvoie hwnd ou 0.
-; Sert à isoler la mini-fenêtre PiP qu'on vient juste de lancer.
-WaitForNewTikTokWindow(before, timeout) {
-    SetTitleMatchMode(2)
-    endTime := A_TickCount + timeout
-    while (A_TickCount < endTime) {
-        for id in WinGetList(Config.windowMatch) {
-            if (!before.Has(id) && WinGetTitle(id) != "")
-                return id
-        }
-        Sleep(120)
+; Libère proprement l'API Magnification quand le script se ferme.
+CleanupMirror(*) {
+    global gMagReady
+    if (gMagReady) {
+        try DllCall("Magnification\MagUninitialize", "Int")
+        gMagReady := false
     }
-    return 0
-}
-
-; Retire TOUT le cadre Windows d'une fenêtre -> rendu "nu" (zéro barre de titre,
-; zéro bouton réduire/agrandir/fermer, zéro bordure).
-StripWindowChrome(hwnd) {
-    static WS_CAPTION    := 0x00C00000   ; barre de titre + boutons
-    static WS_THICKFRAME := 0x00040000   ; bordure redimensionnable
-    static WS_BORDER     := 0x00800000   ; bordure fine
-    static WS_DLGFRAME   := 0x00400000   ; cadre de dialogue
-    static WS_SYSMENU    := 0x00080000   ; menu système (icône + croix)
-    static WS_MINIMIZEBOX:= 0x00020000
-    static WS_MAXIMIZEBOX:= 0x00010000
-
-    remove := WS_CAPTION | WS_THICKFRAME | WS_BORDER | WS_DLGFRAME
-            | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX
-
-    style := WinGetStyle(hwnd)
-    WinSetStyle(style & ~remove, hwnd)
-
-    ; SWP_FRAMECHANGED|SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER = 0x27 -> applique le
-    ; changement de cadre sans bouger/redimensionner.
-    DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", 0
-        , "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 0x27)
-}
-
-; Tente de localiser l'exécutable Chrome puis Edge dans les emplacements
-; standards. Renvoie le chemin trouvé ou "" si aucun.
-DefaultChromiumExe() {
-    candidates := [
-        EnvGet("ProgramFiles") "\Google\Chrome\Application\chrome.exe",
-        EnvGet("ProgramFiles(x86)") "\Google\Chrome\Application\chrome.exe",
-        EnvGet("LocalAppData") "\Google\Chrome\Application\chrome.exe",
-        EnvGet("ProgramFiles") "\Microsoft\Edge\Application\msedge.exe",
-        EnvGet("ProgramFiles(x86)") "\Microsoft\Edge\Application\msedge.exe",
-    ]
-    for path in candidates {
-        if FileExist(path)
-            return path
-    }
-    return ""
 }
