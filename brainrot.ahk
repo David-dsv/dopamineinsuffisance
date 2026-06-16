@@ -167,7 +167,12 @@ OpenMirror() {
          . " w" Config.mirrorWidth " h" Config.mirrorHeight " NoActivate")
 
     ; --- Contrôle "Magnifier" enfant, qui remplit toute la fenêtre hôte -------
-    ; WS_CHILD(0x40000000)|WS_VISIBLE(0x10000000) ; classe "Magnifier".
+    ; WS_CHILD(0x40000000)|WS_VISIBLE(0x10000000). hInstance DOIT être celle de
+    ; Magnification.dll (c'est elle qui enregistre la classe "Magnifier"), pas
+    ; celle du process AHK -> sinon CreateWindowEx échoue (classe introuvable).
+    hMag := DllCall("GetModuleHandle", "Str", "Magnification", "Ptr")
+
+    A_LastError := 0
     mag := DllCall("CreateWindowEx"
         , "UInt", 0
         , "Str", "Magnifier"
@@ -177,14 +182,15 @@ OpenMirror() {
         , "Int", Config.mirrorWidth, "Int", Config.mirrorHeight
         , "Ptr", g.Hwnd
         , "Ptr", 0
-        , "Ptr", 0
+        , "Ptr", hMag
         , "Ptr", 0
         , "Ptr")
 
     if (!mag) {
+        err := A_LastError
         g.Destroy()
-        ToolTip("Miroir : impossible de créer le contrôle Magnifier.")
-        SetTimer(() => ToolTip(), -3000)
+        ToolTip("Miroir : création du contrôle Magnifier échouée (err " err ").")
+        SetTimer(() => ToolTip(), -5000)
         return
     }
 
