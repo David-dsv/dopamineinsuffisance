@@ -47,23 +47,10 @@ Deux couches sont retirées :
    automatiquement, dans un **profil Chrome dédié** (`.pip-profile/`, créé tout
    seul) — ton Chrome perso n'est jamais touché.
 
-> L'extension ne cible plus les classes TikTok (qui changent tout le temps) :
-> elle **cache tout sauf la `<video>`** et ses parents. Robuste aux refontes.
+> TikTok change régulièrement son site. Si un bout d'UI réapparaît un jour,
+> ajoute son sélecteur dans `tiktok-clean/clean.css`.
 > Le mode PiP étant "vidéo seule", les boutons like/suivre ne sont plus
 > cliquables dans la mini-fenêtre — utilise le mode 2e écran (`à`) pour ça.
-
-#### 🐛 Si tu vois encore l'UI TikTok (barre de titre + menus) en mode PiP
-
-C'est le piège classique de Chrome : **si Chrome est déjà ouvert**, ton appui
-sur `=` peut être redirigé vers ton Chrome perso → l'extension et la fenêtre
-nue sont ignorées, tu retombes sur un onglet TikTok normal.
-
-**Comment savoir :** quand l'extension marche, un **fin liseré vert** entoure la
-fenêtre PiP. Pas de liseré vert = extension pas chargée.
-
-**La solution :** ferme **toutes** tes fenêtres Chrome une fois, puis réappuie
-sur `=`. (Le mode PiP utilise un profil Chrome dédié `.pip-profile/`, donc une
-fois lancé il cohabite très bien avec ton Chrome perso rouvert ensuite.)
 
 > `à` et `²` sont reconnues par leur position physique (scancode), donc ça
 > marche en AZERTY. Tu peux changer les touches dans `brainrot.ahk` (section

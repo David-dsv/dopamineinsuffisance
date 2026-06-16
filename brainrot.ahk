@@ -151,28 +151,23 @@ TogglePip() {
 
     ; On charge notre extension "tiktok-clean" qui masque toute l'UI du site
     ; pour ne garder QUE la vidéo. Cela impose :
-    ;   --user-data-dir : un profil dédié. CRUCIAL : c'est ce qui force Chrome
-    ;                     à démarrer un NOUVEAU processus au lieu de rediriger
-    ;                     vers ton Chrome déjà ouvert (sinon --app, l'extension
-    ;                     et la nouvelle fenêtre sont IGNORÉS et tu te retrouves
-    ;                     avec un onglet normal — barre de titre + UI TikTok).
+    ;   --user-data-dir : un profil dédié (Chrome refuse --load-extension
+    ;                     sur le profil normal, et garantit une vraie nouvelle
+    ;                     fenêtre bien positionnée).
     ;   --disable-extensions-except : seule notre extension tourne.
     ;   --app : fenêtre nue, sans onglets ni barre d'URL.
     ext := Config.cleanExtDir
-    if (!DirExist(ext)) {
-        ToolTip("Mode PiP : dossier extension introuvable :`n" ext)
-        SetTimer(() => ToolTip(), -4000)
-        return
+    extArgs := ""
+    if (DirExist(ext)) {
+        extArgs := ' --load-extension="' ext '"'
+                 . ' --disable-extensions-except="' ext '"'
     }
-    extArgs := ' --load-extension="' ext '"'
-             . ' --disable-extensions-except="' ext '"'
 
     Run('"' exe '" --app="' Config.url '"'
         . ' --user-data-dir="' Config.pipProfileDir '"'
         . extArgs
         . ' --no-first-run --no-default-browser-check'
         . ' --disable-features=Translate'
-        . ' --new-window'
         . ' --window-size=' Config.pipWidth ',' Config.pipHeight
         . ' --window-position=' Config.pipX ',' Config.pipY)
 
@@ -322,27 +317,14 @@ PlaceWindowOnMonitor(hwnd, idx) {
 
 ; Attend qu'une fenêtre TikTok ABSENTE de `before` apparaisse. Renvoie hwnd ou 0.
 ; Sert à isoler la mini-fenêtre PiP qu'on vient juste de lancer.
-;
-; IMPORTANT : on PRIORISE une vraie fenêtre "--app" (classe Chrome_WidgetWin_1
-; SANS onglets). Si Chrome a redirigé vers le Chrome déjà ouvert (handoff),
-; on risquerait de saisir un onglet normal ; on l'évite en préférant la
-; nouvelle fenêtre dont le titre ne contient PAS " - Google Chrome".
 WaitForNewTikTokWindow(before, timeout) {
     SetTitleMatchMode(2)
     endTime := A_TickCount + timeout
-    fallback := 0
     while (A_TickCount < endTime) {
         for id in WinGetList(Config.windowMatch) {
-            if (before.Has(id) || WinGetTitle(id) == "")
-                continue
-            title := WinGetTitle(id)
-            ; Une fenêtre --app n'a pas le suffixe " - Google Chrome".
-            if (!InStr(title, " - Google Chrome") && !InStr(title, " - Microsoft"))
-                return id                  ; c'est bien notre fenêtre nue
-            fallback := id                 ; sinon on garde sous le coude
+            if (!before.Has(id) && WinGetTitle(id) != "")
+                return id
         }
-        if (fallback)
-            return fallback
         Sleep(120)
     }
     return 0

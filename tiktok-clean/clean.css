@@ -1,65 +1,59 @@
 /* ===========================================================================
    TikTok Clean — ne garder QUE la vidéo, masquer toute l'UI.
 
-   STRATÉGIE (robuste aux changements de TikTok) :
-   Plutôt que d'énumérer chaque bloc d'UI à cacher (fragile : TikTok renomme
-   ses classes sans arrêt), on fait l'INVERSE :
-     1) on rend tout TRANSPARENT / invisible par défaut ;
-     2) on RÉVÈLE uniquement la balise <video> et ses parents directs.
-   Le JS (clean.js) marque la vidéo + sa chaîne de parents avec l'attribut
-   data-brk="1", et le CSS ci-dessous ne montre que ces éléments-là.
-
-   Avantage : même si TikTok change tous ses noms de classes, tant qu'il y a
-   une <video> dans la page, on l'affiche plein cadre et on cache le reste.
+   TikTok change régulièrement ses noms de classes. On combine donc :
+   1) des sélecteurs sur attributs stables (data-e2e=...) — les plus fiables ;
+   2) des sélecteurs de secours sur des rôles / éléments structurels.
+   Si une partie de l'UI réapparaît un jour, ajoute son sélecteur ici.
    =========================================================================== */
 
-/* --- Tout le contenu de la page est masqué par défaut -------------------- */
-/* On vise les enfants directs de body : on neutralise les overlays, pop-ups
-   de connexion, bannières cookies, sidebars, etc. d'un seul coup.            */
-body > * {
+/* --- Barres de navigation, header, recherche, sidebar --------------------- */
+[data-e2e="nav-bar"],
+[data-e2e="nav-top"],
+[data-e2e="top-nav"],
+[data-e2e="search-box"],
+[data-e2e="navbar"],
+header,
+nav,
+#header,
+.tiktok-header,
+[class*="DivHeaderContainer"],
+[class*="DivSideNavContainer"],
+[class*="DivNavContainer"],
+[class*="DivSidebarContainer"],
+[class*="DivTopNav"],
+[class*="DivHeaderWrapper"] {
   display: none !important;
 }
 
-/* --- On ré-affiche uniquement la chaîne vidéo (marquée par le JS) -------- */
-[data-brk="1"] {
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  position: static !important;
-  inset: auto !important;
-  transform: none !important;
-  z-index: auto !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  max-width: none !important;
-  max-height: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: #000 !important;
-  overflow: hidden !important;
+/* --- Boutons d'action à droite (like / comment / share / suivre) ---------- */
+[data-e2e="feed-like"],
+[data-e2e="like-icon"],
+[data-e2e="comment-icon"],
+[data-e2e="share-icon"],
+[data-e2e="feed-comment-icon"],
+[data-e2e="feed-share-icon"],
+[data-e2e="browse-like-icon"],
+[class*="DivActionItemContainer"],
+[class*="DivVideoActionItemContainer"] {
+  display: none !important;
 }
 
-/* Le conteneur racine (enfant direct de body) reste en flux normal. */
-body > [data-brk="1"] {
-  display: block !important;
+/* --- Métadonnées / légende / suggestions / footer / bannières ------------- */
+[data-e2e="video-author"],
+[data-e2e="browse-video-desc"],
+[data-e2e="video-desc"],
+[data-e2e="recommend-list-item-container"] [data-e2e="video-author"],
+[class*="DivBottomContainer"],
+[class*="DivFooterContainer"],
+[class*="DivDescriptionContentContainer"],
+[class*="CookieBanner"],
+[class*="DivBannerContainer"],
+[class*="DivLoginContainer"] {
+  display: none !important;
 }
 
-/* --- La vidéo elle-même : plein cadre, sans déformation ------------------ */
-video {
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  object-fit: contain !important;
-  background: #000 !important;
-  z-index: 2147483647 !important;   /* au-dessus de tout résidu d'UI */
-}
-
-/* --- Page nue, fond noir, pas de scroll --------------------------------- */
+/* --- Faire occuper toute la fenêtre au conteneur vidéo -------------------- */
 html, body {
   margin: 0 !important;
   padding: 0 !important;
@@ -67,27 +61,21 @@ html, body {
   background: #000 !important;
 }
 
-/* --- TÉMOIN : prouve que l'extension tourne ----------------------------- */
-/* Le JS pose data-brk-active="1" sur <html> dès qu'il s'exécute. Si tu vois
-   ce fin liseré vert au bord de la fenêtre, l'extension EST chargée (le souci
-   serait alors ailleurs). Si tu ne le vois PAS, l'extension n'est pas active
-   -> Chrome a probablement redirigé vers ta fenêtre Chrome déjà ouverte.
-   (Tu peux supprimer cette règle une fois que tout marche.)               */
-html[data-brk-active="1"]::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  border: 3px solid #00e676;
-  pointer-events: none;
-  z-index: 2147483647;
+/* Le wrapper principal de la vidéo doit remplir le viewport. */
+[class*="DivVideoContainer"],
+[class*="DivVideoWrapper"],
+[class*="DivBrowserModeContainer"],
+[class*="DivFeedContainer"] {
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
-/* Filet de sécurité : on masque les overlays plein écran connus (pop-up de
-   connexion, bannières) même s'ils échappent à la règle body > *.          */
-[class*="DivLoginContainer"],
-[class*="CookieBanner"],
-[class*="DivBannerContainer"],
-[id*="login-modal"],
-[role="dialog"] {
-  display: none !important;
+/* La vidéo elle-même : plein cadre, sans déformation. */
+video {
+  width: 100vw !important;
+  height: 100vh !important;
+  object-fit: contain !important;
+  background: #000 !important;
 }
