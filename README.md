@@ -11,12 +11,28 @@ teamfight. Tu restes en game à 100%, ton pouce scrolle des vidéos.
 
 ## Touches
 
-| Touche        | Effet                                      |
-|---------------|--------------------------------------------|
-| `à`           | Ouvre TikTok sur le 2e écran (ou le focus) |
-| `²` (carré)   | Vidéo suivante (scroll bas)                |
-| `Maj` + `²`   | Vidéo précédente (scroll haut)             |
-| `)`           | Mute / unmute la vidéo                      |
+| Touche        | Effet                                                |
+|---------------|------------------------------------------------------|
+| `à`           | Ouvre TikTok sur le 2e écran (ou le focus)           |
+| `²` (carré)   | Vidéo suivante (scroll bas)                          |
+| `Maj` + `²`   | Vidéo précédente (scroll haut)                       |
+| `)`           | Mute / unmute la vidéo                               |
+| `=`           | Mini-fenêtre PiP en haut à gauche de l'écran (on/off)|
+
+### Deux modes, au choix
+
+- **2e écran** (`à`) : TikTok en grand sur ton écran secondaire.
+- **Mini-fenêtre PiP** (`=`) : une petite fenêtre TikTok **sans aucune bordure**,
+  posée en haut à gauche de ton écran principal, **par-dessus League**. Réappuie
+  sur `=` pour la fermer. Idéal si tu n'as qu'un seul écran.
+
+Le scroll (`²`) et le mute (`)`) marchent sur les deux modes — quand la
+mini-fenêtre est ouverte, ils la ciblent en priorité.
+
+> ⚠️ **Mode PiP : League doit être en "Sans bordure" (Borderless)**, pas en
+> plein écran exclusif — sinon Windows masque la mini-fenêtre.
+> Dans LoL : *Options → Vidéo → Mode d'affichage → Sans bordure*.
+> Le mode PiP nécessite **Chrome ou Edge** (utilise le flag `--app`).
 
 > `à` et `²` sont reconnues par leur position physique (scancode), donc ça
 > marche en AZERTY. Tu peux changer les touches dans `brainrot.ahk` (section
