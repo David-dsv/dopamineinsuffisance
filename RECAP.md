@@ -21,11 +21,11 @@ Pensé pour un **setup 2 écrans**, avec un mode mono-écran via **miroir live**
 | Outil | **AutoHotkey v2** (hotkeys globales + contrôle de fenêtre, rien à compiler) |
 | Méthode scroll | **Scroll en arrière-plan** : on envoie `WM_MOUSEWHEEL` directement à la fenêtre du navigateur → League garde le focus à 100% |
 | Affichage TikTok | **Navigateur web** (tiktok.com) sur le 2e écran |
-| Mode mono-écran | **Miroir live** du 2e écran via l'API Windows **Magnification** |
+| Mode mono-écran | **Picture-in-Picture natif** du navigateur (Chrome), déclenché par Alt+P |
 
 > Note : le développement se fait sur **Mac**, mais le script ne tourne que sur
-> **Windows** (AutoHotkey + Magnification.dll = Windows uniquement). Donc non
-> testable depuis la machine de dev.
+> **Windows** (AutoHotkey = Windows uniquement). Donc non testable depuis la
+> machine de dev.
 
 ## ⌨️ Touches (clavier AZERTY FR, mappées par scancode)
 
@@ -35,24 +35,26 @@ Pensé pour un **setup 2 écrans**, avec un mode mono-écran via **miroir live**
 | `²` (carré)| SC029 | **Vidéo suivante** (scroll bas) |
 | `Maj` + `²`| +SC029| Vidéo précédente (scroll haut) |
 | `)`        | SC00C | **Mute / unmute** la vidéo (envoie `m`) |
-| `=`        | SC00D | **Miroir live** du 2e écran, en haut à gauche de l'écran principal (toggle) |
+| `=`        | SC00D | **Picture-in-Picture** : détache la vidéo en mini-fenêtre flottante (toggle) |
 
-## 🪞 Le mode miroir (touche `=`) — approche actuelle
+## 🖼️ Le mode PiP (touche `=`) — approche actuelle
 
-Au lieu d'ouvrir une 2e fenêtre TikTok (l'ancienne approche Chrome `--app` +
-extension, qui posait trop de problèmes : barre de titre persistante, UI TikTok
-visible, handoff Chrome), on **recopie en direct une zone du 2e écran** dans une
-petite fenêtre flottante always-on-top sur l'écran principal.
+On utilise le **Picture-in-Picture NATIF du navigateur** : Chrome détache la
+vidéo TikTok dans une mini-fenêtre flottante que le navigateur épingle
+lui-même par-dessus tout (donc par-dessus League). Pas de capture, pas de DLL,
+pas de 2e fenêtre TikTok.
 
-- API utilisée : **Magnification.dll** (contrôle de classe `Magnifier`).
-- La fenêtre hôte est nue (`-Caption`, `+ToolWindow`, `+E0x80000` = LAYERED).
-- Un timer ré-appelle `MagSetWindowSource` à ~30 fps → image live.
-- On mirrore **tout le 2e écran** (`monitorIndex`), donc TikTok doit y être
-  maximisé (ce que fait déjà la touche `à`).
-- Pas de récursion (source = écran 2, miroir = écran 1).
+- **Prérequis utilisateur** : installer l'extension officielle Google
+  *Picture-in-Picture* (gratuite, 1 clic). Elle ajoute le raccourci **Alt+P**.
+- Le script envoie ce raccourci à la fenêtre TikTok quand on presse `=`.
+- **Déclenchement** (`TogglePictureInPicture`) : si `pipAllowFocusFallback` est
+  `true` (défaut), bref focus sur TikTok → `Send(Alt+P)` → retour du focus à
+  League. Sinon, tentative en arrière-plan via `ControlSend` (moins fiable pour
+  les combos Alt). On n'envoie le raccourci **qu'une seule fois** (sinon le PiP
+  toggle deux fois et se referme).
 
-Le scroll (`²`) et le mute (`)`) visent toujours la **vraie** fenêtre TikTok du
-2e écran ; le miroir affiche le résultat en direct.
+Le scroll (`²`) et le mute (`)`) visent toujours la **vraie** fenêtre TikTok ;
+le PiP affiche la même vidéo en flottant.
 
 ## 📁 Structure du projet
 
@@ -62,8 +64,8 @@ extensionpj/
 ├── README.md             # Guide d'install + dépannage pour les amis
 ├── RECAP.md              # Ce fichier
 ├── .gitignore
-└── tiktok-clean/         # (ancienne extension Chrome — plus utilisée par le
-                          #  mode miroir, conservée pour historique)
+└── tiktok-clean/         # (ancienne extension Chrome — plus utilisée,
+                          #  conservée pour historique)
 ```
 
 ## 🐛 Historique des approches du mode mono-écran
@@ -73,8 +75,12 @@ extensionpj/
    revenait, UI TikTok pas masquée, **handoff Chrome** (Chrome déjà ouvert →
    `--app`/extension/profil ignorés). Tentative de fix (extension "cacher tout
    sauf la vidéo" + témoin vert) **n'a pas marché non plus** → **revert**.
-2. **Miroir live du 2e écran via Magnification API** (approche ACTUELLE) :
-   beaucoup plus simple et fiable, aucune dépendance navigateur.
+2. **Miroir live du 2e écran via Magnification API** : `CreateWindowEx` classe
+   "Magnifier" échouait avec **err 1407** (CANNOT_FIND_WND_CLASS), même avec le
+   bon hInstance. L'API Magnification ne coopère pas sur la machine cible →
+   **abandonné**.
+3. **Picture-in-Picture natif (Alt+P)** (approche ACTUELLE) : le plus simple et
+   fiable. Une seule dépendance : l'extension Google PiP côté utilisateur.
 
 ## 🔗 GitHub
 
@@ -86,22 +92,22 @@ Commits faits sous le compte `David-dsv`.
 - [x] Scroll en arrière-plan fonctionnel (**confirmé : "marche grave bien"**)
 - [x] Mute en arrière-plan (`)`)
 - [x] Mode 2e écran (`à`)
-- [x] Mode miroir (`=`) réécrit via Magnification API
+- [x] Mode PiP (`=`) réécrit via Picture-in-Picture natif (Alt+P)
 
 ### ⏳ À tester par l'utilisateur (Windows)
 
-1. `git pull`, recharger le script ([Reload]).
-2. `à` pour ouvrir TikTok sur le 2e écran (maximisé).
-3. `=` → une petite fenêtre en haut à gauche doit **refléter en direct** le 2e
-   écran. Scroller avec `²` doit se voir bouger dans le miroir.
-4. Si message *"Magnification.dll indisponible"* : à investiguer (rare).
+1. **Installer l'extension Google Picture-in-Picture** (lien dans le README).
+2. Vérifier que **Alt+P** détache bien la vidéo quand on est manuellement sur
+   l'onglet TikTok (sanity check de l'extension).
+3. `git pull`, recharger le script ([Reload]).
+4. `à` pour ouvrir TikTok, puis `=` → la vidéo doit se détacher en mini-fenêtre
+   flottante. Re-`=` pour la refermer.
 
 ## 💡 Pistes / idées non encore faites
 
-- Recadrer le miroir sur une **zone verticale** (ratio TikTok) au lieu de tout
-  l'écran, pour éviter le noir sur les côtés (`MagSetWindowSource` avec un RECT
-  plus étroit centré).
-- Raccourci pour **déplacer / redimensionner** le miroir à la volée.
-- Miroir **semi-transparent** quand on ne le regarde pas (`WinSetTransparent`).
+- Si le bref focus gêne : tester `pipAllowFocusFallback := false` (PiP en
+  arrière-plan via ControlSend — à voir si ça marche selon le navigateur).
+- Raccourci pour **déplacer / redimensionner** la fenêtre PiP (limité : c'est
+  le navigateur qui la contrôle).
 - Binds **like** (`L`) ou **play/pause** sur TikTok.
 - Mode **auto-scroll** (une vidéo toutes les X secondes, mains libres).

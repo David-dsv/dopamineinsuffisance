@@ -17,34 +17,34 @@ teamfight. Tu restes en game à 100%, ton pouce scrolle des vidéos.
 | `²` (carré)   | Vidéo suivante (scroll bas)                          |
 | `Maj` + `²`   | Vidéo précédente (scroll haut)                       |
 | `)`           | Mute / unmute la vidéo                               |
-| `=`           | Miroir live du 2e écran en haut à gauche (on/off)    |
+| `=`           | Picture-in-Picture : détache la vidéo en mini-fenêtre|
 
 ### Deux modes, au choix
 
 - **2e écran** (`à`) : TikTok en grand sur ton écran secondaire.
-- **Miroir live** (`=`) : une petite fenêtre flottante en haut à gauche de ton
-  écran principal qui **recopie en direct ton 2e écran**, par-dessus League.
-  Tu vois donc TikTok (ce qui tourne sur l'écran 2) sans quitter ta game.
-  Réappuie sur `=` pour le fermer. Pratique quand tu regardes l'écran principal.
+- **Picture-in-Picture** (`=`) : détache la vidéo TikTok dans une **mini-fenêtre
+  flottante** que le navigateur épingle par-dessus tout (donc par-dessus
+  League). Réappuie sur `=` pour la refermer. Pratique en mono-écran.
 
-Le scroll (`²`) et le mute (`)`) visent toujours la vraie fenêtre TikTok du 2e
-écran — et tu vois le changement en direct dans le miroir.
+Le scroll (`²`) et le mute (`)`) visent toujours la vraie fenêtre TikTok — et tu
+vois le changement en direct dans la mini-fenêtre PiP.
 
-> ⚠️ **League doit être en "Sans bordure" (Borderless)**, pas en plein écran
-> exclusif — sinon Windows masque la fenêtre miroir.
-> Dans LoL : *Options → Vidéo → Mode d'affichage → Sans bordure*.
+#### ⭐ Prérequis du PiP (à faire une fois)
 
-#### Comment marche le miroir
+Le mode `=` utilise le **Picture-in-Picture natif de Chrome**, déclenché par le
+raccourci **Alt+P** de l'extension officielle Google. Installe-la (gratuit,
+1 clic) :
 
-On utilise l'**API Magnification de Windows** (intégrée à Windows, rien à
-installer) : elle sait afficher en temps réel le contenu d'une zone de l'écran.
-On crée une petite fenêtre nue always-on-top, et un timer y recopie ton 2e écran
-~30 fois par seconde. Aucun navigateur en plus, aucun focus volé : c'est juste
-une "loupe" live de l'écran 2.
+➡️ **[Picture-in-Picture Extension (by Google)](https://chromewebstore.google.com/detail/picture-in-picture-extension/hkgfoiooedgoejojocmhlaklaeopbecg)**
 
-> Le miroir recopie **tout le 2e écran**, donc garde TikTok maximisé là-bas
-> (la touche `à` le fait). Tu peux régler la taille/position du miroir dans
-> `brainrot.ahk` (section `Config`, variables `mirror...`).
+Une fois installée, le raccourci `Alt+P` détache/rattache la vidéo. Le script
+n'a plus qu'à l'envoyer pour toi quand tu appuies sur `=`.
+
+> Si tu as changé le raccourci de l'extension, reporte-le dans `brainrot.ahk`
+> (`Config.pipShortcut`, ex: `"^."` pour Ctrl+. ).
+> Par défaut le script donne un **bref focus** à TikTok le temps de déclencher
+> le PiP, puis rend le focus à League. Pour ne jamais voler le focus, mets
+> `Config.pipAllowFocusFallback := false` (mais le PiP peut alors échouer).
 
 > `à` et `²` sont reconnues par leur position physique (scancode), donc ça
 > marche en AZERTY. Tu peux changer les touches dans `brainrot.ahk` (section
@@ -56,9 +56,11 @@ une "loupe" live de l'écran 2.
    « Download » → v2). C'est gratuit, ~5 Mo.
 2. Double-clique sur **`brainrot.ahk`**. Une icône verte « H » apparaît dans
    la barre des tâches → le script tourne.
-3. Branche ton 2e écran, lance League, et appuie sur `à` pour ouvrir TikTok.
-   (Puis `=` pour afficher le miroir du 2e écran sur ton écran principal.)
-4. Scrolle avec `²`. Profite. 💀
+3. (Pour le mode `=`) Installe l'extension Google Picture-in-Picture — voir le
+   lien dans la section « Prérequis du PiP » plus haut.
+4. Branche ton 2e écran, lance League, et appuie sur `à` pour ouvrir TikTok.
+   (Puis `=` pour détacher la vidéo en mini-fenêtre flottante.)
+5. Scrolle avec `²`. Profite. 💀
 
 Pour l'arrêter : clic droit sur l'icône verte → *Exit*.
 
@@ -72,10 +74,10 @@ Tout est en haut de `brainrot.ahk` dans la classe `Config` :
 - `wheelClicks` : « force » du scroll par appui (3 = un bon coup, change la
   vidéo à coup sûr). Baisse à 1 si ça scrolle trop.
 - `windowMatch` : mot-clé cherché dans le titre de la fenêtre (`TikTok`).
-- `mirrorWidth` / `mirrorHeight` : taille de la fenêtre miroir (380×680).
-- `mirrorX` / `mirrorY` : position du miroir sur l'écran principal (20,20).
-- `mirrorFps` : fluidité du miroir (30 par défaut ; 60 = plus fluide, plus de CPU).
-- `mirrorSourceMonitor` : écran recopié (`0` = suit `monitorIndex`).
+- `pipShortcut` : raccourci du PiP (par défaut `"!p"` = Alt+P, celui de
+  l'extension Google). Change-le si tu as personnalisé l'extension.
+- `pipAllowFocusFallback` : `true` = bref focus sur TikTok pour déclencher le
+  PiP (fiable). `false` = jamais de focus volé, mais le PiP peut échouer.
 
 ## Lancer au démarrage de Windows (optionnel)
 
@@ -88,9 +90,13 @@ dedans. Le scroller sera prêt à chaque démarrage.
 - **Le scroll ne change pas la vidéo** → augmente `wheelClicks` (ex: 5).
   Certains navigateurs/sites veulent un scroll plus franc.
 - **Ça ouvre sur le mauvais écran** → change `monitorIndex` (1, 2, 3...).
-- **Le miroir (`=`) montre le mauvais écran** → règle `mirrorSourceMonitor`.
-- **Le miroir est noir / vide** → vérifie que quelque chose s'affiche bien sur
-  le 2e écran (lance TikTok avec `à`), et que League est en *Sans bordure*.
+- **Le PiP (`=`) ne se déclenche pas** → vérifie que l'extension Google
+  Picture-in-Picture est bien installée, et qu'Alt+P marche quand tu es
+  manuellement sur l'onglet TikTok. Vérifie aussi le raccourci dans
+  `chrome://extensions/shortcuts` (doit être Alt+P, sinon adapte `pipShortcut`).
+- **Le PiP s'ouvre puis se referme tout seul** → ton raccourci est peut-être
+  envoyé deux fois ; garde `pipAllowFocusFallback := true` (le script n'envoie
+  alors le raccourci qu'une seule fois).
 - **Les touches `à`/`²` font autre chose dans League** → rebind dans la section
   HOTKEYS du script (ex: `Numpad0`, `XButton1` souris, etc.).
 

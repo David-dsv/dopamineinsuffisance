@@ -2,18 +2,8 @@
 #SingleInstance Force
 SendMode("Input")
 
-; À la fermeture du script, on libère l'API Magnification si elle a été init.
-OnExit(CleanupMirror)
-
-; ----------------------------------------------------------------------------
-;  ÉTAT GLOBAL
-; ----------------------------------------------------------------------------
-; Objet GUI de la fenêtre miroir quand elle est ouverte, sinon 0.
-global gMirrorGui := 0
-; hwnd du contrôle "Magnifier" à l'intérieur de la fenêtre miroir.
-global gMagHwnd := 0
-; true si Magnification.dll a bien été initialisée (MagInitialize).
-global gMagReady := false
+; (Le mode PiP utilise le Picture-in-Picture natif du navigateur — aucun état
+;  global à maintenir : c'est Chrome qui gère la mini-fenêtre flottante.)
 
 ; ============================================================================
 ;  BRAINROT COMPANION  —  TikTok scroller pour gamers League of Legends
@@ -27,7 +17,8 @@ global gMagReady := false
 ;     ²   -> scrolle d'une vidéo (vers le bas)
 ;     Maj + ²  -> scrolle vers le haut (vidéo précédente)
 ;     )   -> mute / unmute la vidéo
-;     =   -> MIROIR live du 2e écran en haut à gauche de l'écran principal (on/off)
+;     =   -> Picture-in-Picture : détache la vidéo TikTok en mini-fenêtre
+;            flottante (PiP natif du navigateur). Voir prérequis ci-dessous.
 ;
 ;  Config tout en bas du fichier (chemin du navigateur, écran, touches...).
 ; ============================================================================
@@ -60,22 +51,21 @@ class Config {
     ; reconnaître l'onglet TikTok.
     static windowMatch := "TikTok"
 
-    ; --- Miroir live du 2e écran (overlay sur l'écran principal) — touche "=" ---
-    ; Le miroir recopie en direct une ZONE du 2e écran (là où TikTok est
-    ; maximisé) dans une petite fenêtre flottante, par-dessus League.
+    ; --- Picture-in-Picture (touche "=") ---
+    ; PRÉREQUIS : installe l'extension Google "Picture-in-Picture" (gratuite,
+    ;   1 clic) sur ton Chrome. Elle ajoute le raccourci Alt+P qui détache la
+    ;   vidéo en cours dans une mini-fenêtre flottante :
+    ;   https://chromewebstore.google.com/detail/picture-in-picture-extension/hkgfoiooedgoejojocmhlaklaeopbecg
     ;
-    ; Taille de la fenêtre miroir, en pixels (ratio vertical type TikTok 9:16).
-    static mirrorWidth := 380
-    static mirrorHeight := 680
-    ; Position depuis le coin haut-gauche de l'écran principal, en pixels.
-    static mirrorX := 20
-    static mirrorY := 20
-    ; Rafraîchissements par seconde du miroir. 30 = fluide et léger ; monte à 60
-    ; pour plus de fluidité (un peu plus de CPU/GPU).
-    static mirrorFps := 30
-    ; Quel écran on recopie. Par défaut le même que TikTok (monitorIndex).
-    ; Laisse 0 pour suivre automatiquement monitorIndex.
-    static mirrorSourceMonitor := 0
+    ; Raccourci que l'extension écoute pour (dé)clencher le PiP.
+    ; Format AHK : "!p" = Alt+P. Si tu changes le raccourci de l'extension,
+    ; mets-le ici dans la même syntaxe (ex: "^." = Ctrl+. ).
+    static pipShortcut := "!p"
+
+    ; Si le raccourci envoyé en arrière-plan ne marche pas, on autorise un bref
+    ; passage de focus sur TikTok (puis retour à League) pour le déclencher.
+    ; Mets false si tu ne veux JAMAIS de focus volé (mais le PiP peut échouer).
+    static pipAllowFocusFallback := true
 }
 
 
@@ -91,7 +81,7 @@ SC00B::OpenTikTok()          ; touche "à"  -> ouvrir / focus TikTok (2e écran)
 SC029::ScrollTikTok(-1)      ; touche "²"  -> vidéo suivante (scroll bas)
 +SC029::ScrollTikTok(+1)     ; Maj + "²"   -> vidéo précédente (scroll haut)
 SC00C::ToggleMuteTikTok()    ; touche ")"  -> mute / unmute TikTok
-SC00D::ToggleMirror()        ; touche "="  -> miroir live du 2e écran on/off
+SC00D::TogglePictureInPicture() ; touche "="  -> PiP : détache la vidéo TikTok
 
 
 ; ----------------------------------------------------------------------------
@@ -121,129 +111,50 @@ OpenTikTok() {
 
 
 ; ----------------------------------------------------------------------------
-;  MIROIR LIVE DU 2e ÉCRAN (overlay sur l'écran principal)  —  touche "="
+;  PICTURE-IN-PICTURE (mini-fenêtre vidéo flottante)  —  touche "="
 ; ----------------------------------------------------------------------------
-;  Au lieu d'ouvrir une 2e fenêtre TikTok (galère : Chrome, extension, etc.),
-;  on RECOPIE EN DIRECT une zone du 2e écran — là où TikTok est déjà maximisé —
-;  dans une petite fenêtre flottante par-dessus League. Aucun navigateur en
-;  plus, aucun focus volé : c'est juste une "loupe" temps réel de l'écran 2.
+;  On utilise le PiP NATIF du navigateur : Chrome détache la vidéo en cours
+;  dans une petite fenêtre flottante, always-on-top, gérée par le navigateur
+;  lui-même (pas de capture, pas de DLL, pas de 2e fenêtre TikTok).
 ;
-;  Techniquement : on utilise l'API Windows "Magnification" (Magnification.dll).
-;  Elle fournit un contrôle (classe "Magnifier") qui sait afficher en live le
-;  contenu d'un rectangle de l'écran. On le met dans une fenêtre GUI nue,
-;  always-on-top, et un timer rafraîchit la source N fois par seconde.
+;  Déclenchement : l'extension Google "Picture-in-Picture" écoute Alt+P. On
+;  envoie ce raccourci à la fenêtre TikTok. Réappuyer referme le PiP (le même
+;  raccourci fait toggle). PRÉREQUIS : extension installée (voir Config).
 ;
-;  Toggle : 1er appui -> ouvre le miroir. 2e appui -> le ferme.
+;  Stratégie focus (pipAllowFocusFallback dans Config) :
+;    - true  (défaut) : bref focus sur TikTok -> Alt+P -> retour focus à League.
+;                       Le plus fiable (les combos Alt passent mal sans focus).
+;    - false          : envoi en arrière-plan (ControlSend), zéro focus volé,
+;                       mais le PiP peut ne pas se déclencher selon le navigateur.
+;  On envoie le raccourci UNE seule fois (il fait toggle ouvrir/fermer).
 ; ----------------------------------------------------------------------------
-ToggleMirror() {
-    global gMirrorGui
-
-    ; Déjà ouvert -> on ferme.
-    if (gMirrorGui) {
-        CloseMirror()
+TogglePictureInPicture() {
+    hwnd := FindTikTokWindow()
+    if (!hwnd) {
+        ToolTip("TikTok pas ouvert — appuie sur 'à' pour le lancer.")
+        SetTimer(() => ToolTip(), -1500)
         return
     }
-    OpenMirror()
-}
 
-OpenMirror() {
-    global gMirrorGui, gMagHwnd, gMagReady
-
-    ; Init de l'API Magnification (une seule fois par exécution du script).
-    if (!gMagReady) {
-        if (!DllCall("Magnification\MagInitialize", "Int")) {
-            ToolTip("Miroir : Magnification.dll indisponible sur ce Windows.")
-            SetTimer(() => ToolTip(), -3000)
-            return
+    ; IMPORTANT : on n'envoie le raccourci QU'UNE fois (sinon le PiP s'ouvre
+    ; puis se referme, car le même raccourci fait toggle).
+    if (Config.pipAllowFocusFallback) {
+        ; Méthode bref-focus (la plus fiable pour un combo Alt+touche) :
+        ; on active TikTok le temps d'envoyer Alt+P, puis on rend le focus.
+        prevActive := WinActive("A")          ; fenêtre active avant (League)
+        WinActivate(hwnd)
+        if (WinWaitActive("ahk_id " hwnd, , 0.4)) {
+            Send(Config.pipShortcut)
+            Sleep(120)                        ; laisse l'extension réagir
         }
-        gMagReady := true
+        ; On rend le focus à ce qui était actif avant (League), si possible.
+        if (prevActive && WinExist("ahk_id " prevActive))
+            WinActivate("ahk_id " prevActive)
+    } else {
+        ; Mode "zéro focus volé" : on tente en arrière-plan (peut échouer selon
+        ; le navigateur, car les combos Alt passent mal sans focus réel).
+        try ControlSend(Config.pipShortcut, , hwnd)
     }
-
-    ; --- Fenêtre hôte : nue, sans bordure, always-on-top, par-dessus League ---
-    ; +E0x80000 = WS_EX_LAYERED, requis par l'API Magnification pour l'hôte.
-    g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000")
-    g.BackColor := "000000"
-    g.Show("x" Config.mirrorX " y" Config.mirrorY
-         . " w" Config.mirrorWidth " h" Config.mirrorHeight " NoActivate")
-
-    ; --- Contrôle "Magnifier" enfant, qui remplit toute la fenêtre hôte -------
-    ; WS_CHILD(0x40000000)|WS_VISIBLE(0x10000000). hInstance DOIT être celle de
-    ; Magnification.dll (c'est elle qui enregistre la classe "Magnifier"), pas
-    ; celle du process AHK -> sinon CreateWindowEx échoue (classe introuvable).
-    hMag := DllCall("GetModuleHandle", "Str", "Magnification", "Ptr")
-
-    A_LastError := 0
-    mag := DllCall("CreateWindowEx"
-        , "UInt", 0
-        , "Str", "Magnifier"
-        , "Str", "MagnifierControl"
-        , "UInt", 0x40000000 | 0x10000000
-        , "Int", 0, "Int", 0
-        , "Int", Config.mirrorWidth, "Int", Config.mirrorHeight
-        , "Ptr", g.Hwnd
-        , "Ptr", 0
-        , "Ptr", hMag
-        , "Ptr", 0
-        , "Ptr")
-
-    if (!mag) {
-        err := A_LastError
-        g.Destroy()
-        ToolTip("Miroir : création du contrôle Magnifier échouée (err " err ").")
-        SetTimer(() => ToolTip(), -5000)
-        return
-    }
-
-    gMirrorGui := g
-    gMagHwnd := mag
-
-    ; Premier cadrage de la source + démarrage du rafraîchissement live.
-    ; Timer RÉPÉTITIF (période positive en ms) : re-capture l'écran 2 N fps.
-    UpdateMirrorSource()
-    fps := Config.mirrorFps > 0 ? Config.mirrorFps : 30
-    SetTimer(UpdateMirrorSource, Round(1000 / fps))
-
-    ; On force la fenêtre tout en haut sans lui donner le focus (League garde la main).
-    WinSetAlwaysOnTop(1, g.Hwnd)
-}
-
-CloseMirror() {
-    global gMirrorGui, gMagHwnd
-    SetTimer(UpdateMirrorSource, 0)     ; stoppe le rafraîchissement
-    if (gMirrorGui) {
-        try gMirrorGui.Destroy()
-    }
-    gMirrorGui := 0
-    gMagHwnd := 0
-}
-
-; Indique au contrôle Magnifier QUELLE zone de l'écran recopier (le 2e écran),
-; et l'ÉTIRE pour remplir la petite fenêtre. Appelé en boucle par le timer :
-; c'est ce qui rend l'image "live" (le contrôle re-capture à chaque appel).
-UpdateMirrorSource() {
-    global gMirrorGui, gMagHwnd
-    if (!gMirrorGui || !gMagHwnd)
-        return
-
-    ; Écran source : celui de TikTok, sauf override explicite dans la config.
-    idx := Config.mirrorSourceMonitor > 0
-         ? Config.mirrorSourceMonitor : Config.monitorIndex
-    count := MonitorGetCount()
-    if (idx > count)
-        idx := count
-    MonitorGet(idx, &left, &top, &right, &bottom)
-
-    ; RECT source = tout l'écran à recopier. On le passe par un buffer (4x Int32).
-    rect := Buffer(16, 0)
-    NumPut("Int", left,   rect, 0)
-    NumPut("Int", top,    rect, 4)
-    NumPut("Int", right,  rect, 8)
-    NumPut("Int", bottom, rect, 12)
-
-    ; MagSetWindowSource(hwndMag, RECT) : définit la zone capturée. Le contrôle
-    ; étire automatiquement cette zone pour remplir sa propre taille (notre
-    ; petite fenêtre) -> le 2e écran apparaît réduit dans le miroir.
-    DllCall("Magnification\MagSetWindowSource", "Ptr", gMagHwnd, "Ptr", rect, "Int")
 }
 
 
@@ -357,13 +268,4 @@ PlaceWindowOnMonitor(hwnd, idx) {
     WinRestore(hwnd)
     WinMove(left, top, right - left, bottom - top, hwnd)
     WinMaximize(hwnd)
-}
-
-; Libère proprement l'API Magnification quand le script se ferme.
-CleanupMirror(*) {
-    global gMagReady
-    if (gMagReady) {
-        try DllCall("Magnification\MagUninitialize", "Int")
-        gMagReady := false
-    }
 }
