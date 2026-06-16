@@ -40,6 +40,11 @@ raccourci **Alt+P** de l'extension officielle Google. Installe-la (gratuit,
 Une fois installée, le raccourci `Alt+P` détache/rattache la vidéo. Le script
 n'a plus qu'à l'envoyer pour toi quand tu appuies sur `=`.
 
+Chrome ouvre la fenêtre PiP près de l'onglet TikTok (souvent sur le 2e écran) :
+le script la **replace automatiquement en haut à gauche de ton écran
+principal**, par-dessus League. Tu peux régler ça dans la config (`pipX`,
+`pipY`, `pipMonitorIndex`), ou le désactiver avec `pipMoveToMain := false`.
+
 > Si tu as changé le raccourci de l'extension, reporte-le dans `brainrot.ahk`
 > (`Config.pipShortcut`, ex: `"^."` pour Ctrl+. ).
 > Par défaut le script donne un **bref focus** à TikTok le temps de déclencher
@@ -78,6 +83,10 @@ Tout est en haut de `brainrot.ahk` dans la classe `Config` :
   l'extension Google). Change-le si tu as personnalisé l'extension.
 - `pipAllowFocusFallback` : `true` = bref focus sur TikTok pour déclencher le
   PiP (fiable). `false` = jamais de focus volé, mais le PiP peut échouer.
+- `pipMoveToMain` : `true` = déplace la fenêtre PiP sur l'écran principal après
+  ouverture. `false` = laisse Chrome la placer où il veut.
+- `pipMonitorIndex` : écran de destination de la PiP (`1` = principal).
+- `pipX` / `pipY` : position de la PiP depuis le coin haut-gauche (20,20).
 
 ## Lancer au démarrage de Windows (optionnel)
 
@@ -97,6 +106,10 @@ dedans. Le scroller sera prêt à chaque démarrage.
 - **Le PiP s'ouvre puis se referme tout seul** → ton raccourci est peut-être
   envoyé deux fois ; garde `pipAllowFocusFallback := true` (le script n'envoie
   alors le raccourci qu'une seule fois).
+- **Le PiP s'ouvre mais reste sur le mauvais écran** → le script repère la
+  fenêtre PiP par son titre ("Picture-in-Picture" / "Image dans l'image"). Si
+  ton Chrome est dans une autre langue, le titre diffère : dis-le-moi pour
+  l'ajouter, ou ajuste la liste dans `FindPipWindow()` (dans `brainrot.ahk`).
 - **Les touches `à`/`²` font autre chose dans League** → rebind dans la section
   HOTKEYS du script (ex: `Numpad0`, `XButton1` souris, etc.).
 

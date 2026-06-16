@@ -52,6 +52,13 @@ pas de 2e fenêtre TikTok.
   League. Sinon, tentative en arrière-plan via `ControlSend` (moins fiable pour
   les combos Alt). On n'envoie le raccourci **qu'une seule fois** (sinon le PiP
   toggle deux fois et se referme).
+- **Placement** : Chrome ouvre la PiP près de l'onglet source (2e écran). Le
+  script la **déplace ensuite sur l'écran principal** (haut-gauche par défaut).
+  On repère la fenêtre PiP par son **titre** ("Picture-in-Picture" /
+  "Image dans l'image") via `FindPipWindow`, on attend son apparition
+  (`WaitForPipWindow`), puis `MovePipToMain` (déplace sans redimensionner ;
+  c'est Chrome qui gère le ratio). Désactivable via `pipMoveToMain := false`.
+  Config : `pipMonitorIndex`, `pipX`, `pipY`.
 
 Le scroll (`²`) et le mute (`)`) visent toujours la **vraie** fenêtre TikTok ;
 le PiP affiche la même vidéo en flottant.
@@ -93,15 +100,17 @@ Commits faits sous le compte `David-dsv`.
 - [x] Mute en arrière-plan (`)`)
 - [x] Mode 2e écran (`à`)
 - [x] Mode PiP (`=`) réécrit via Picture-in-Picture natif (Alt+P)
+- [x] PiP **se déclenche** (confirmé par l'utilisateur)
+- [x] PiP **déplacée auto** sur l'écran principal (haut-gauche)
 
 ### ⏳ À tester par l'utilisateur (Windows)
 
-1. **Installer l'extension Google Picture-in-Picture** (lien dans le README).
-2. Vérifier que **Alt+P** détache bien la vidéo quand on est manuellement sur
-   l'onglet TikTok (sanity check de l'extension).
-3. `git pull`, recharger le script ([Reload]).
-4. `à` pour ouvrir TikTok, puis `=` → la vidéo doit se détacher en mini-fenêtre
-   flottante. Re-`=` pour la refermer.
+1. `git pull`, recharger le script ([Reload]).
+2. `à` pour ouvrir TikTok, puis `=` → la vidéo doit se détacher ET **se replacer
+   en haut à gauche de l'écran principal** (avant elle restait en bas à droite
+   du 2e écran). Re-`=` pour la refermer.
+3. Si elle ne bouge pas : ton Chrome est peut-être dans une autre langue → me
+   donner le titre exact de la fenêtre PiP pour l'ajouter à `FindPipWindow`.
 
 ## 💡 Pistes / idées non encore faites
 

@@ -66,6 +66,18 @@ class Config {
     ; passage de focus sur TikTok (puis retour à League) pour le déclencher.
     ; Mets false si tu ne veux JAMAIS de focus volé (mais le PiP peut échouer).
     static pipAllowFocusFallback := true
+
+    ; Chrome ouvre la fenêtre PiP près de l'onglet source (souvent le 2e écran).
+    ; On la REPLACE ensuite sur l'écran principal, dans le coin haut-gauche.
+    ; Mets pipMoveToMain := false pour laisser Chrome décider (pas de déplacement).
+    static pipMoveToMain := true
+    ; Écran de destination de la fenêtre PiP (1 = principal).
+    static pipMonitorIndex := 1
+    ; Position depuis le coin haut-gauche de cet écran, en pixels.
+    static pipX := 20
+    static pipY := 20
+    ; Titre de la fenêtre PiP, pour la repérer. Chrome FR = "Image dans l'image",
+    ; EN = "Picture-in-Picture". On matche les deux par mots-clés (voir code).
 }
 
 
@@ -136,6 +148,10 @@ TogglePictureInPicture() {
         return
     }
 
+    ; Une fenêtre PiP est-elle DÉJÀ ouverte ? Si oui, cet appui va la FERMER
+    ; (toggle) -> inutile de chercher à déplacer quoi que ce soit ensuite.
+    pipBefore := FindPipWindow()
+
     ; IMPORTANT : on n'envoie le raccourci QU'UNE fois (sinon le PiP s'ouvre
     ; puis se referme, car le même raccourci fait toggle).
     if (Config.pipAllowFocusFallback) {
@@ -155,6 +171,54 @@ TogglePictureInPicture() {
         ; le navigateur, car les combos Alt passent mal sans focus réel).
         try ControlSend(Config.pipShortcut, , hwnd)
     }
+
+    ; Si c'était une OUVERTURE (aucun PiP avant) et qu'on veut la replacer,
+    ; on attend que Chrome crée sa fenêtre PiP puis on la pousse sur l'écran 1.
+    if (Config.pipMoveToMain && !pipBefore) {
+        if (pip := WaitForPipWindow(2500))
+            MovePipToMain(pip)
+    }
+}
+
+; Repère la fenêtre Picture-in-Picture du navigateur, ou 0 si aucune.
+; Chrome nomme cette fenêtre "Picture-in-Picture" (EN) ou "Image dans l'image"
+; (FR). On matche sur ces titres (mode "contient", insensible aux variantes).
+FindPipWindow() {
+    SetTitleMatchMode(2)
+    for title in ["Picture-in-Picture", "Picture in picture", "Image dans l'image"] {
+        if (id := WinExist(title))
+            return id
+    }
+    return 0
+}
+
+; Attend l'apparition d'une fenêtre PiP (timeout en ms). Renvoie hwnd ou 0.
+WaitForPipWindow(timeout) {
+    endTime := A_TickCount + timeout
+    while (A_TickCount < endTime) {
+        if (id := FindPipWindow())
+            return id
+        Sleep(80)
+    }
+    return 0
+}
+
+; Déplace la fenêtre PiP dans le coin haut-gauche de l'écran principal (config).
+; On NE touche PAS à sa taille (le navigateur gère le ratio vidéo lui-même).
+MovePipToMain(pip) {
+    idx := Config.pipMonitorIndex
+    count := MonitorGetCount()
+    if (idx > count)
+        idx := count
+    ; MonitorGetWorkArea = zone hors barre des tâches -> coin propre.
+    MonitorGetWorkArea(idx, &left, &top, &right, &bottom)
+
+    x := left + Config.pipX
+    y := top + Config.pipY
+    ; On bouge sans redimensionner : on relit la taille actuelle et on la garde.
+    WinGetPos(, , &w, &h, pip)
+    WinMove(x, y, w, h, pip)
+    WinSetAlwaysOnTop(1, pip)          ; reste par-dessus League (déjà le cas)
 }
 
 
