@@ -16,6 +16,7 @@ teamfight. Tu restes en game à 100%, ton pouce scrolle des vidéos.
 | `à`           | Ouvre TikTok sur le 2e écran (ou le focus) |
 | `²` (carré)   | Vidéo suivante (scroll bas)                |
 | `Maj` + `²`   | Vidéo précédente (scroll haut)             |
+| `)`           | Mute / unmute la vidéo                      |
 
 > `à` et `²` sont reconnues par leur position physique (scancode), donc ça
 > marche en AZERTY. Tu peux changer les touches dans `brainrot.ahk` (section

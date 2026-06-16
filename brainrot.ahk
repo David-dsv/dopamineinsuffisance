@@ -13,6 +13,7 @@ SendMode("Input")
 ;     à   -> ouvre (ou met au premier plan) TikTok sur le 2e écran
 ;     ²   -> scrolle d'une vidéo (vers le bas)
 ;     Maj + ²  -> scrolle vers le haut (vidéo précédente)
+;     )   -> mute / unmute la vidéo
 ;
 ;  Config tout en bas du fichier (chemin du navigateur, écran, touches...).
 ; ============================================================================
@@ -58,6 +59,7 @@ class Config {
 SC00B::OpenTikTok()          ; touche "à"  -> ouvrir / focus TikTok
 SC029::ScrollTikTok(-1)      ; touche "²"  -> vidéo suivante (scroll bas)
 +SC029::ScrollTikTok(+1)     ; Maj + "²"   -> vidéo précédente (scroll haut)
+SC00D::ToggleMuteTikTok()    ; touche ")"  -> mute / unmute TikTok
 
 
 ; ----------------------------------------------------------------------------
@@ -124,6 +126,24 @@ ScrollTikTok(direction) {
         PostMessage(0x020A, wParam, lParam, , target)
         Sleep(8)
     }
+}
+
+; ----------------------------------------------------------------------------
+;  MUTE / UNMUTE EN ARRIÈRE-PLAN
+; ----------------------------------------------------------------------------
+;  Sur TikTok web, la touche "m" coupe / remet le son de la vidéo. On l'envoie
+;  directement à la fenêtre du navigateur via ControlSend -> pas de focus volé,
+;  League continue de tourner pendant que tu coupes le son des brainrots.
+; ----------------------------------------------------------------------------
+ToggleMuteTikTok() {
+    hwnd := FindTikTokWindow()
+    if (!hwnd) {
+        ToolTip("TikTok pas ouvert — appuie sur 'à' pour le lancer.")
+        SetTimer(() => ToolTip(), -1500)
+        return
+    }
+    ; "m" est le raccourci natif mute/unmute du lecteur TikTok web.
+    ControlSend("m", , hwnd)
 }
 
 ; Renvoie le hwnd du contrôle situé sous un point écran (x, y).
