@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "TikTok Clean (Brainrot PiP)",
+  "version": "1.0.0",
+  "description": "Masque toute l'UI de TikTok pour ne garder que la video. Utilise par le mode PiP de Brainrot Companion.",
+  "content_scripts": [
+    {
+      "matches": ["*://*.tiktok.com/*"],
+      "css": ["clean.css"],
+      "js": ["clean.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}

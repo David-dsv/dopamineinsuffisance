@@ -1,0 +1,81 @@
+/* ===========================================================================
+   TikTok Clean — ne garder QUE la vidéo, masquer toute l'UI.
+
+   TikTok change régulièrement ses noms de classes. On combine donc :
+   1) des sélecteurs sur attributs stables (data-e2e=...) — les plus fiables ;
+   2) des sélecteurs de secours sur des rôles / éléments structurels.
+   Si une partie de l'UI réapparaît un jour, ajoute son sélecteur ici.
+   =========================================================================== */
+
+/* --- Barres de navigation, header, recherche, sidebar --------------------- */
+[data-e2e="nav-bar"],
+[data-e2e="nav-top"],
+[data-e2e="top-nav"],
+[data-e2e="search-box"],
+[data-e2e="navbar"],
+header,
+nav,
+#header,
+.tiktok-header,
+[class*="DivHeaderContainer"],
+[class*="DivSideNavContainer"],
+[class*="DivNavContainer"],
+[class*="DivSidebarContainer"],
+[class*="DivTopNav"],
+[class*="DivHeaderWrapper"] {
+  display: none !important;
+}
+
+/* --- Boutons d'action à droite (like / comment / share / suivre) ---------- */
+[data-e2e="feed-like"],
+[data-e2e="like-icon"],
+[data-e2e="comment-icon"],
+[data-e2e="share-icon"],
+[data-e2e="feed-comment-icon"],
+[data-e2e="feed-share-icon"],
+[data-e2e="browse-like-icon"],
+[class*="DivActionItemContainer"],
+[class*="DivVideoActionItemContainer"] {
+  display: none !important;
+}
+
+/* --- Métadonnées / légende / suggestions / footer / bannières ------------- */
+[data-e2e="video-author"],
+[data-e2e="browse-video-desc"],
+[data-e2e="video-desc"],
+[data-e2e="recommend-list-item-container"] [data-e2e="video-author"],
+[class*="DivBottomContainer"],
+[class*="DivFooterContainer"],
+[class*="DivDescriptionContentContainer"],
+[class*="CookieBanner"],
+[class*="DivBannerContainer"],
+[class*="DivLoginContainer"] {
+  display: none !important;
+}
+
+/* --- Faire occuper toute la fenêtre au conteneur vidéo -------------------- */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #000 !important;
+}
+
+/* Le wrapper principal de la vidéo doit remplir le viewport. */
+[class*="DivVideoContainer"],
+[class*="DivVideoWrapper"],
+[class*="DivBrowserModeContainer"],
+[class*="DivFeedContainer"] {
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* La vidéo elle-même : plein cadre, sans déformation. */
+video {
+  width: 100vw !important;
+  height: 100vh !important;
+  object-fit: contain !important;
+  background: #000 !important;
+}

@@ -22,9 +22,11 @@ teamfight. Tu restes en game à 100%, ton pouce scrolle des vidéos.
 ### Deux modes, au choix
 
 - **2e écran** (`à`) : TikTok en grand sur ton écran secondaire.
-- **Mini-fenêtre PiP** (`=`) : une petite fenêtre TikTok **sans aucune bordure**,
-  posée en haut à gauche de ton écran principal, **par-dessus League**. Réappuie
-  sur `=` pour la fermer. Idéal si tu n'as qu'un seul écran.
+- **Mini-fenêtre PiP** (`=`) : une petite fenêtre **avec UNIQUEMENT la vidéo
+  TikTok** — zéro bordure Windows (pas de boutons réduire/agrandir/fermer) et
+  zéro interface du site (pas de barre latérale, recherche, boutons). Juste la
+  vidéo, posée en haut à gauche de ton écran principal, **par-dessus League**.
+  Réappuie sur `=` pour la fermer. Idéal si tu n'as qu'un seul écran.
 
 Le scroll (`²`) et le mute (`)`) marchent sur les deux modes — quand la
 mini-fenêtre est ouverte, ils la ciblent en priorité.
@@ -32,7 +34,23 @@ mini-fenêtre est ouverte, ils la ciblent en priorité.
 > ⚠️ **Mode PiP : League doit être en "Sans bordure" (Borderless)**, pas en
 > plein écran exclusif — sinon Windows masque la mini-fenêtre.
 > Dans LoL : *Options → Vidéo → Mode d'affichage → Sans bordure*.
-> Le mode PiP nécessite **Chrome ou Edge** (utilise le flag `--app`).
+> Le mode PiP nécessite **Chrome ou Edge**.
+
+#### Comment le mode PiP n'affiche que la vidéo
+
+Deux couches sont retirées :
+1. **La fenêtre Windows** : on lance Chrome en mode `--app` puis on supprime
+   tout le cadre (barre de titre + boutons) via l'API Windows.
+2. **L'interface du site TikTok** : une petite **extension Chrome locale**
+   (dossier `tiktok-clean/`, d'où le nom du projet 😏) masque toute l'UI du
+   site par CSS pour ne laisser que la `<video>`. Elle se charge
+   automatiquement, dans un **profil Chrome dédié** (`.pip-profile/`, créé tout
+   seul) — ton Chrome perso n'est jamais touché.
+
+> TikTok change régulièrement son site. Si un bout d'UI réapparaît un jour,
+> ajoute son sélecteur dans `tiktok-clean/clean.css`.
+> Le mode PiP étant "vidéo seule", les boutons like/suivre ne sont plus
+> cliquables dans la mini-fenêtre — utilise le mode 2e écran (`à`) pour ça.
 
 > `à` et `²` sont reconnues par leur position physique (scancode), donc ça
 > marche en AZERTY. Tu peux changer les touches dans `brainrot.ahk` (section
@@ -42,10 +60,14 @@ mini-fenêtre est ouverte, ils la ciblent en priorité.
 
 1. **Installe AutoHotkey v2** : https://www.autohotkey.com/ (bouton
    « Download » → v2). C'est gratuit, ~5 Mo.
-2. Double-clique sur **`brainrot.ahk`**. Une icône verte « H » apparaît dans
+2. **Garde tout le dossier ensemble** : `brainrot.ahk` et le dossier
+   `tiktok-clean/` doivent rester côte à côte (le mode PiP charge l'extension
+   depuis là).
+3. Double-clique sur **`brainrot.ahk`**. Une icône verte « H » apparaît dans
    la barre des tâches → le script tourne.
-3. Branche ton 2e écran, lance League, et appuie sur `à` pour ouvrir TikTok.
-4. Scrolle avec `²`. Profite. 💀
+4. Branche ton 2e écran, lance League, et appuie sur `à` pour ouvrir TikTok.
+   (Ou `=` pour la mini-fenêtre vidéo sur l'écran principal.)
+5. Scrolle avec `²`. Profite. 💀
 
 Pour l'arrêter : clic droit sur l'icône verte → *Exit*.
 

@@ -60,6 +60,14 @@ class Config {
     ; Position depuis le coin haut-gauche de l'écran principal, en pixels.
     static pipX := 20
     static pipY := 20
+
+    ; Dossier de l'extension Chrome qui masque l'UI TikTok (juste la vidéo).
+    ; Par défaut : sous-dossier "tiktok-clean" à côté de ce script.
+    static cleanExtDir := A_ScriptDir "\tiktok-clean"
+
+    ; Profil Chrome DÉDIÉ au mode PiP (obligatoire pour charger l'extension
+    ; sans toucher au Chrome perso de l'utilisateur). Créé automatiquement.
+    static pipProfileDir := A_ScriptDir "\.pip-profile"
 }
 
 
@@ -140,7 +148,26 @@ TogglePip() {
         SetTimer(() => ToolTip(), -2500)
         return
     }
+
+    ; On charge notre extension "tiktok-clean" qui masque toute l'UI du site
+    ; pour ne garder QUE la vidéo. Cela impose :
+    ;   --user-data-dir : un profil dédié (Chrome refuse --load-extension
+    ;                     sur le profil normal, et garantit une vraie nouvelle
+    ;                     fenêtre bien positionnée).
+    ;   --disable-extensions-except : seule notre extension tourne.
+    ;   --app : fenêtre nue, sans onglets ni barre d'URL.
+    ext := Config.cleanExtDir
+    extArgs := ""
+    if (DirExist(ext)) {
+        extArgs := ' --load-extension="' ext '"'
+                 . ' --disable-extensions-except="' ext '"'
+    }
+
     Run('"' exe '" --app="' Config.url '"'
+        . ' --user-data-dir="' Config.pipProfileDir '"'
+        . extArgs
+        . ' --no-first-run --no-default-browser-check'
+        . ' --disable-features=Translate'
         . ' --window-size=' Config.pipWidth ',' Config.pipHeight
         . ' --window-position=' Config.pipX ',' Config.pipY)
 
@@ -153,9 +180,22 @@ TogglePip() {
     }
 
     gPipHwnd := pip
-    StripWindowChrome(pip)                 ; enlève la barre de titre Windows
-    WinMove(Config.pipX, Config.pipY, Config.pipWidth, Config.pipHeight, pip)
     WinSetAlwaysOnTop(1, pip)              ; reste visible par-dessus League
+
+    ; Chrome redessine son cadre juste après l'ouverture : on enlève la barre
+    ; de titre une 1re fois, puis on la ré-enlève après un court délai pour
+    ; écraser ce que Chrome aurait redessiné. Enfin on repositionne proprement.
+    StripWindowChrome(pip)
+    SetTimer(() => FinalizePip(pip), -350)
+}
+
+; Re-applique le retrait du cadre + le placement, une fois Chrome stabilisé.
+FinalizePip(hwnd) {
+    if (!WinExist("ahk_id " hwnd))
+        return
+    StripWindowChrome(hwnd)
+    WinMove(Config.pipX, Config.pipY, Config.pipWidth, Config.pipHeight, hwnd)
+    WinSetAlwaysOnTop(1, hwnd)
 }
 
 
@@ -290,13 +330,23 @@ WaitForNewTikTokWindow(before, timeout) {
     return 0
 }
 
-; Retire la barre de titre / le cadre Windows d'une fenêtre -> rendu "nu".
-; On enlève les styles WS_CAPTION et WS_THICKFRAME puis on force le rafraîchi.
+; Retire TOUT le cadre Windows d'une fenêtre -> rendu "nu" (zéro barre de titre,
+; zéro bouton réduire/agrandir/fermer, zéro bordure).
 StripWindowChrome(hwnd) {
-    static WS_CAPTION := 0x00C00000
-    static WS_THICKFRAME := 0x00040000
+    static WS_CAPTION    := 0x00C00000   ; barre de titre + boutons
+    static WS_THICKFRAME := 0x00040000   ; bordure redimensionnable
+    static WS_BORDER     := 0x00800000   ; bordure fine
+    static WS_DLGFRAME   := 0x00400000   ; cadre de dialogue
+    static WS_SYSMENU    := 0x00080000   ; menu système (icône + croix)
+    static WS_MINIMIZEBOX:= 0x00020000
+    static WS_MAXIMIZEBOX:= 0x00010000
+
+    remove := WS_CAPTION | WS_THICKFRAME | WS_BORDER | WS_DLGFRAME
+            | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX
+
     style := WinGetStyle(hwnd)
-    WinSetStyle(style & ~WS_CAPTION & ~WS_THICKFRAME, hwnd)
+    WinSetStyle(style & ~remove, hwnd)
+
     ; SWP_FRAMECHANGED|SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER = 0x27 -> applique le
     ; changement de cadre sans bouger/redimensionner.
     DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", 0
