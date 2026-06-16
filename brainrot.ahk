@@ -76,6 +76,17 @@ class Config {
     ; Position depuis le coin haut-gauche de cet écran, en pixels.
     static pipX := 20
     static pipY := 20
+
+    ; Largeur MAX de la fenêtre PiP (px). Les vidéos paysage rendent une fenêtre
+    ; large qui bloque la vue : on la plafonne ici. La vidéo paysage sera alors
+    ; petite, mais ne mangera plus tout l'écran. 0 = pas de limite.
+    static pipMaxWidth := 380
+
+    ; Fenêtre PiP INCLIQUABLE (click-through) : les clics traversent la fenêtre
+    ; vers League -> tu continues à cliquer dans ton jeu même "à travers" la PiP.
+    ; (Le scroll/mute passent par les touches, pas par la souris, donc OK.)
+    static pipClickThrough := true
+
     ; Titre de la fenêtre PiP, pour la repérer. Chrome FR = "Image dans l'image",
     ; EN = "Picture-in-Picture". On matche les deux par mots-clés (voir code).
 }
@@ -203,8 +214,8 @@ WaitForPipWindow(timeout) {
     return 0
 }
 
-; Déplace la fenêtre PiP dans le coin haut-gauche de l'écran principal (config).
-; On NE touche PAS à sa taille (le navigateur gère le ratio vidéo lui-même).
+; Place la fenêtre PiP en haut-gauche de l'écran principal, plafonne sa largeur
+; (pour que les vidéos paysage ne bloquent pas la vue) et la rend incliquable.
 MovePipToMain(pip) {
     idx := Config.pipMonitorIndex
     count := MonitorGetCount()
@@ -215,10 +226,41 @@ MovePipToMain(pip) {
 
     x := left + Config.pipX
     y := top + Config.pipY
-    ; On bouge sans redimensionner : on relit la taille actuelle et on la garde.
+
+    ; Taille actuelle (Chrome la fixe selon le ratio de la vidéo).
     WinGetPos(, , &w, &h, pip)
+
+    ; Plafond de largeur : si trop large (vidéo paysage), on réduit largeur ET
+    ; hauteur dans le MÊME ratio -> la vidéo reste correcte, juste plus petite.
+    if (Config.pipMaxWidth > 0 && w > Config.pipMaxWidth) {
+        scale := Config.pipMaxWidth / w
+        w := Config.pipMaxWidth
+        h := Round(h * scale)
+    }
+
     WinMove(x, y, w, h, pip)
     WinSetAlwaysOnTop(1, pip)          ; reste par-dessus League (déjà le cas)
+
+    ; Click-through : les clics traversent la PiP vers League.
+    if (Config.pipClickThrough)
+        MakeWindowClickThrough(pip)
+}
+
+; Rend une fenêtre incliquable : la souris la traverse (clics -> fenêtre du
+; dessous, ex: League). On ajoute les styles étendus WS_EX_LAYERED + TRANSPARENT
+; (TRANSPARENT seul exige LAYERED pour que le click-through fonctionne).
+MakeWindowClickThrough(hwnd) {
+    static WS_EX_LAYERED     := 0x80000
+    static WS_EX_TRANSPARENT := 0x20
+    static LWA_ALPHA         := 0x2
+
+    ex := WinGetExStyle(hwnd)
+    WinSetExStyle(ex | WS_EX_LAYERED | WS_EX_TRANSPARENT, hwnd)
+
+    ; LAYERED rend la fenêtre invisible tant qu'on n'a pas fixé son opacité :
+    ; on force 255 (totalement opaque) pour que la PiP reste bien visible.
+    DllCall("SetLayeredWindowAttributes"
+        , "Ptr", hwnd, "UInt", 0, "UChar", 255, "UInt", LWA_ALPHA)
 }
 
 

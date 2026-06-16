@@ -25,6 +25,8 @@ teamfight. Tu restes en game à 100%, ton pouce scrolle des vidéos.
 - **Picture-in-Picture** (`=`) : détache la vidéo TikTok dans une **mini-fenêtre
   flottante** que le navigateur épingle par-dessus tout (donc par-dessus
   League). Réappuie sur `=` pour la refermer. Pratique en mono-écran.
+  La fenêtre est **incliquable** (les clics passent vers League) et sa **largeur
+  est plafonnée** pour qu'une vidéo paysage ne bloque pas toute ta vue.
 
 Le scroll (`²`) et le mute (`)`) visent toujours la vraie fenêtre TikTok — et tu
 vois le changement en direct dans la mini-fenêtre PiP.
@@ -87,6 +89,10 @@ Tout est en haut de `brainrot.ahk` dans la classe `Config` :
   ouverture. `false` = laisse Chrome la placer où il veut.
 - `pipMonitorIndex` : écran de destination de la PiP (`1` = principal).
 - `pipX` / `pipY` : position de la PiP depuis le coin haut-gauche (20,20).
+- `pipMaxWidth` : largeur max de la fenêtre PiP (380). Les vidéos paysage qui
+  bloquaient toute la vue sont réduites (à ratio gardé). `0` = pas de limite.
+- `pipClickThrough` : `true` = fenêtre PiP **incliquable**, les clics traversent
+  vers League (tu joues "à travers" la PiP). `false` = fenêtre cliquable.
 
 ## Lancer au démarrage de Windows (optionnel)
 

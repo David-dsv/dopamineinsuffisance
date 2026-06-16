@@ -56,9 +56,18 @@ pas de 2e fenêtre TikTok.
   script la **déplace ensuite sur l'écran principal** (haut-gauche par défaut).
   On repère la fenêtre PiP par son **titre** ("Picture-in-Picture" /
   "Image dans l'image") via `FindPipWindow`, on attend son apparition
-  (`WaitForPipWindow`), puis `MovePipToMain` (déplace sans redimensionner ;
-  c'est Chrome qui gère le ratio). Désactivable via `pipMoveToMain := false`.
-  Config : `pipMonitorIndex`, `pipX`, `pipY`.
+  (`WaitForPipWindow`), puis `MovePipToMain`. Désactivable via
+  `pipMoveToMain := false`. Config : `pipMonitorIndex`, `pipX`, `pipY`.
+- **Largeur max** (`pipMaxWidth`, 380) : une vidéo paysage donne une fenêtre PiP
+  large qui bloque la vue. `MovePipToMain` plafonne la largeur et réduit la
+  hauteur dans le même ratio (la vidéo reste correcte, juste plus petite).
+  ⚠️ Limite : le PiP natif ne permet PAS de **cropper** un paysage en portrait
+  (c'est Chrome qui dessine) — on ne peut que plafonner la taille de la fenêtre.
+- **Incliquable** (`pipClickThrough`, true) : `MakeWindowClickThrough` ajoute
+  `WS_EX_LAYERED | WS_EX_TRANSPARENT` + `SetLayeredWindowAttributes(alpha=255)`
+  (le LAYERED rendrait la fenêtre invisible sans alpha forcé). Les clics
+  traversent la PiP vers League. Le scroll/mute passant par les touches (pas la
+  souris), aucune interaction souris n'est nécessaire sur la PiP.
 
 Le scroll (`²`) et le mute (`)`) visent toujours la **vraie** fenêtre TikTok ;
 le PiP affiche la même vidéo en flottant.
