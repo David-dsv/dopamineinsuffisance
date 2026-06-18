@@ -76,13 +76,40 @@ le PiP affiche la même vidéo en flottant.
 
 ```
 extensionpj/
-├── brainrot.ahk          # Script principal AutoHotkey v2 (toute la logique)
-├── README.md             # Guide d'install + dépannage pour les amis
+├── brainrot.ahk          # WINDOWS — script AutoHotkey v2 (toute la logique)
+├── README.md             # Guide Windows + pointeur vers la version Mac
 ├── RECAP.md              # Ce fichier
 ├── .gitignore
+├── mac/                  # macOS — version Hammerspoon (Lua)
+│   ├── brainrot.lua      #   script principal (équivalent du .ahk)
+│   ├── keycode-finder.lua#   outil pour trouver les keycodes du clavier
+│   └── README.md         #   install Hammerspoon + compromis macOS
 └── tiktok-clean/         # (ancienne extension Chrome — plus utilisée,
                           #  conservée pour historique)
 ```
+
+## 🍎 Version macOS (Hammerspoon)
+
+AutoHotkey étant Windows-only, la version Mac est réécrite en **Lua pour
+Hammerspoon** (`mac/brainrot.lua`). Mêmes touches, sauf **`@` au lieu de `²`**
+pour scroller (le `²` n'existe pas sur Mac).
+
+Compromis macOS (documentés dans `mac/README.md`) :
+- **Scroll** : macOS n'a pas de `PostMessage(WM_MOUSEWHEEL)`. On déplace le
+  curseur sur la fenêtre TikTok (2e écran), on poste le scroll, puis on remet
+  le curseur où il était. Le **focus clavier ne bouge pas** (League OK), mais le
+  curseur saute visuellement un court instant.
+- **Mute** : l'envoi de `m` en arrière-plan n'est pas garanti à 100% sur macOS
+  (à confirmer en test ; fallback "bref focus" possible).
+- **PiP** : natif navigateur (extension Google ⌥P), sans le click-through ni la
+  largeur-max de la version Windows (styles Win32 sans équivalent simple).
+
+Liaison des touches **par caractère** par défaut ; bascule possible en
+**keycodes** (`USE_KEYCODES = true`) avec `keycode-finder.lua` si une touche ne
+répond pas (claviers AZERTY/ISO Mac varient).
+
+Syntaxe Lua des deux fichiers **validée** (`luac -p`). Comportement runtime
+**non testé** (ni Hammerspoon ni 2e écran ni League sur la machine de dev).
 
 ## 🐛 Historique des approches du mode mono-écran
 
@@ -111,6 +138,7 @@ Commits faits sous le compte `David-dsv`.
 - [x] Mode PiP (`=`) réécrit via Picture-in-Picture natif (Alt+P)
 - [x] PiP **se déclenche** (confirmé par l'utilisateur)
 - [x] PiP **déplacée auto** sur l'écran principal (haut-gauche)
+- [x] **Version macOS** (Hammerspoon) écrite, syntaxe Lua validée, `@` = scroll
 
 ### ⏳ À tester par l'utilisateur (Windows)
 
@@ -120,6 +148,15 @@ Commits faits sous le compte `David-dsv`.
    du 2e écran). Re-`=` pour la refermer.
 3. Si elle ne bouge pas : ton Chrome est peut-être dans une autre langue → me
    donner le titre exact de la fenêtre PiP pour l'ajouter à `FindPipWindow`.
+
+### ⏳ À tester par l'utilisateur (macOS)
+
+1. Installer **Hammerspoon** + copier `mac/brainrot.lua` en `~/.hammerspoon/init.lua`.
+2. Droits **Accessibilité** pour Hammerspoon, puis Reload Config.
+3. Tester `à` / `@` / `Maj+@` / `)` / `=`. Si une touche ne répond pas →
+   `mac/keycode-finder.lua` puis `USE_KEYCODES = true`.
+4. Vérifier si le **mute (`)`)** marche en arrière-plan ; sinon me le dire pour
+   passer en mode "bref focus".
 
 ## 💡 Pistes / idées non encore faites
 

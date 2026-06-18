@@ -3,6 +3,10 @@
 Pour les vrais : scrolle TikTok sur ton 2e écran **pendant ta game de League**,
 sans jamais quitter la partie. Plus jamais de manque de dopamine en farmant.
 
+> 🪟 **Windows** : ce README (script `brainrot.ahk`, AutoHotkey).
+> 🍎 **macOS** : voir le dossier [`mac/`](mac/) (script Hammerspoon, touche `@`
+> pour scroller au lieu de `²`). Compromis macOS expliqués dans `mac/README.md`.
+
 ## Comment ça marche
 
 Le scroll est envoyé **directement à la fenêtre du navigateur en arrière-plan**.
